@@ -1,0 +1,16 @@
+services:
+  server:
+    image: rust:1
+    working_dir: /app/server
+    volumes:
+      - ../:/app
+    command: bash -lc "cd /app && cargo run -p taric-server"
+  runner:
+    image: python:3.11
+    working_dir: /tests
+    volumes:
+      - ./runner:/tests
+      - ./fixtures:/fixtures
+    command: ["python","main.py"]
+    depends_on:
+      - server

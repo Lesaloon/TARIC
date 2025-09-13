@@ -1,0 +1,2 @@
+requests
+# pynacl  # optional if you add signing demo

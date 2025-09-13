@@ -1,0 +1,7 @@
+[workspace]
+members = [
+  "core",
+  "server",
+  "tools/verifier"
+]
+resolver = "2"

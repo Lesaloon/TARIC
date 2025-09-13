@@ -1,0 +1,9 @@
+[package]
+name = "taric-core"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-only"
+
+[lib]
+name = "taric_core"
+path = "src/lib.rs"

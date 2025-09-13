@@ -1,0 +1,12 @@
+[package]
+name = "taric-server"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-only"
+
+[lib]
+name = "taric_server"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+taric-core = { path = "../core" }

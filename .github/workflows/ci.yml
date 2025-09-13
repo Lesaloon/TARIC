@@ -1,0 +1,16 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - name: Build Rust workspace
+      run: cargo build --workspace --verbose
+    - name: Build C client
+      run: make -C clients/c
+    - name: .NET build (example)
+      uses: actions/setup-dotnet@v4
+      with: { dotnet-version: '8.0.x' }
+    - run: dotnet build examples/server-csharp/TaricServerDemo/TaricServerDemo.csproj

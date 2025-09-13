@@ -1,0 +1,32 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "server-csharp", "server-csharp", "{68547A69-8230-D49E-E50F-0A9B30A435A3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaricServerDemo", "examples\server-csharp\TaricServerDemo\TaricServerDemo.csproj", "{34B20018-23F8-579D-BE1F-FC0997C8DC37}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{34B20018-23F8-579D-BE1F-FC0997C8DC37}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{34B20018-23F8-579D-BE1F-FC0997C8DC37}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{34B20018-23F8-579D-BE1F-FC0997C8DC37}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{34B20018-23F8-579D-BE1F-FC0997C8DC37}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{68547A69-8230-D49E-E50F-0A9B30A435A3} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{34B20018-23F8-579D-BE1F-FC0997C8DC37} = {68547A69-8230-D49E-E50F-0A9B30A435A3}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {CEA68BAA-61C9-41DD-B2E8-D9146E6F10F1}
+	EndGlobalSection
+EndGlobal

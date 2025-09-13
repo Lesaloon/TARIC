@@ -1,0 +1,38 @@
+# Rust
+target/
+**/*.rs.bk
+
+# C / build
+build/
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+
+# C#
+bin/
+obj/
+*.user
+*.suo
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# VSCode / IDEs
+.vscode/
+.idea/
+
+# Misc
+.DS_Store
+
+# Dev files
+TODO.md
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*.old
