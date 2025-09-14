@@ -1,110 +1,66 @@
 # TARIC
 
-**TARIC** (Tamper-Resistant IoT Chain) is a platform-agnostic logging framework for **IoT devices** and servers.
-It ensures **tamper-evidence**, **cryptographic verification**, and **auditability** of logs across constrained devices and backend systems.
+TARIC (Tamper-Resistant IoT Chain) is a lightweight protocol and toolkit for tamper-evident device logs.
+Devices sign entries, servers verify and chain them, and servers return signed ACKs so devices can confirm inclusion.
 
----
+— See `docs/context.md` for a quick intro and `docs/api/wire-format.md` for the exact wire format.
 
-## 🚀 Features
+## Features
 
-- 🔒 **Signed log entries** from IoT devices
-- 🔗 **Tamper-proof hash chain** maintained on the server
-- 📨 **Signed acknowledgments (ACKs)** so devices can verify server inclusion
-- 🌍 **Transport-agnostic** (MQTT, HTTP, TCP … your choice)
-- 🪶 Lightweight **C client library** for ESP32 and other MCUs
-- ⚡ Secure, memory-safe **Rust core** for the server
-- 🧪 CLI verifier for forensic log audits (upcoming)
+- Signed device entries (Ed25519 initially)
+- Tamper-evident chaining via `previous_entry_hash` and SHA-256
+- Signed server ACKs for inclusion confirmation
+- Pluggable trust (bring-your-own key source / revocation)
+- Minimal Rust core, C client (ESP32 WIP), Python example client
 
----
+## Architecture
 
-## 🧭 Architecture Overview
+- Device: builds an entry, computes `entry_hash` over CBOR-canonicalized fields, signs the canonical message, and sends JSON.
+- Server: verifies hash + signature using device’s public key from a trust source, enforces chain rules, persists state, returns a signed ACK.
 
-### On the IoT Device
-- **Your program** generates log events (e.g., sensor readings)
-- **TARIC Client (C library)** signs each log entry with the device’s private key
-- The signed entry is sent to the server
-- Optionally: device verifies a **signed ACK** from the server to confirm the log was chained
+High-level diagram: `docs/diagrams/overview.png`.
 
-### On the Server
-- **Your receiver** ingests entries from devices (any protocol)
-- **Your program** passes them into the TARIC Core
-- **TARIC Core (Rust library)**:
-  - Verifies device signature
-  - Adds the entry to the tamper-proof chain
-  - Writes to append-only log files
-  - Issues a **signed ACK** back to the device
-- **Log files** can later be audited with the TARIC verifier tool
+## Wire Format (summary)
 
-see /docs/overview.png for a diagram
+Log Entry fields (see full spec for ordering):
+- version, entry_hash, device_id, timestamp, session_id, nonce, algo, key_id, payload, signature, previous_entry_hash
 
----
+ACK fields:
+- entry_id, new_entry_hash, status, timestamp, server_signer_id, server_signature
 
-## 📄 Log Entry Format (JSON example)
+Canonicalization uses CBOR with strict field ordering; the `signature` is computed over the canonicalized tuple that includes the `entry_hash`.
 
-```json
-{
-  "device_id": "device123",
-  "timestamp": "2025-09-13T10:12:30Z",
-  "message": "Temperature: 28.3C",
-  "nonce": "a1f9c2...",
-  "signature": "base64-encoded-sig"
-}
-````
+## Quickstart
 
----
-
-## 📄 ACK Format (JSON example)
-
-```json
-{
-  "entry_id": 42,
-  "previous_hash": "7b4c2d...",
-  "new_entry_hash": "c5f9a8...",
-  "status": "accepted",
-  "timestamp": "2025-09-13T10:12:31Z",
-  "server_signature": "base64-encoded-sig"
-}
-```
-
-> ⚠️ ACKs are **not part of the tamper-proof chain**, but they let the device confirm that the server accepted and chained the log entry.
-
----
-
-## 🛠️ Build & Run
-
-### ESP32 Client
-
+Rust workspace:
 ```bash
-cd clients/esp32
-idf.py build flash monitor
+bash -lc "cd /mnt/c/Users/guill/code/TARIC && cargo build"
 ```
 
-### TARIC Server
-
+Run only the core unit tests:
 ```bash
-cd server
-cargo run --release
+bash -lc "cd /mnt/c/Users/guill/code/TARIC && cargo test -p taric-core"
 ```
 
-### CLI Verifier
-
+End-to-end (Docker):
 ```bash
-cd tools/verifier
-cargo run --release -- verify ../server/logs/session1.log
+bash -lc "cd /mnt/c/Users/guill/code/TARIC/tests-e2e && docker compose -f compose.yml up --build --abort-on-container-exit"
 ```
 
----
+This starts a simple HTTP server (`taric-server`) and a Python runner that generates a device key, sends two valid chained entries (accepted), then a replay (rejected).
 
-## 📋 License
+## Repos & Components
 
-TARIC is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
-You may use it commercially, but **any modifications must also be open-sourced under the same license**.
+- `core/`: Rust library implementing the verification logic and ACK signing.
+- `server/`: minimal HTTP demo server using the core. See `server/README.md`.
+- `clients/`: device-side clients (C/ESP32 WIP).
+- `examples/client-python/`: toy Python client.
+- `tests-e2e/`: dockerized end-to-end tests.
 
----
+## License
 
-## 🤝 Contributing
+AGPL-3.0-only. See `LICENSE`.
 
-Contributions are welcome!
-Feel free to open issues, submit pull requests, or share your integration stories.
+## Contributing
 
----
+Issues and PRs welcome.

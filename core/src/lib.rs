@@ -1,18 +1,26 @@
-pub struct VerifyingKey {
-    pub algo: &'static str,
-    pub key: Vec<u8>,
-    pub key_id: Option<String>,
-}
+//! TARIC core library: verification, chaining, and ACK signing.
+//!
+//! Implements the wire format from `docs/api/wire-format.md`:
+//! - CBOR-based canonicalization for hashing and signing
+//! - SHA-256 entry hashing (hex-encoded)
+//! - Ed25519 signature verification for device entries
+//! - Server ACK generation and signing
+//! - Pluggable device trust and chain state
+//!
+//! See `docs/context.md` for the high-level overview.
 
-pub trait DeviceTrust: Send + Sync {
-    fn get_key(&self, device_id: &str, key_id: Option<&str>) -> Option<VerifyingKey>;
-    fn is_revoked(&self, _device_id: &str, _key_id: Option<&str>) -> bool { false }
-}
+pub mod errors;
+pub mod traits;
+pub mod types;
+pub mod verifier;
 
-pub trait AckSigner: Send + Sync {
-    fn signer_id(&self) -> &'static str;
-    fn sign(&self, msg: &[u8]) -> Vec<u8>;
-}
+pub use errors::VerifyError;
+pub use traits::{AckSigner, ChainStore, DeviceTrust};
+pub use types::{Ack, LogEntry, VerifyingKey};
+pub use verifier::{Ed25519AckSigner, InMemoryChainStore, Verifier};
 
-// TODO: add chaining/storage/verify logic here.
+/// Library version string.
 pub fn version() -> &'static str { "taric-core 0.1.0" }
+
+#[cfg(test)]
+mod tests;

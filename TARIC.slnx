@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/examples/" />
+  <Folder Name="/examples/server-csharp/">
+    <Project Path="examples/server-csharp/TaricServerDemo/TaricServerDemo.csproj" />
+  </Folder>
+</Solution>
