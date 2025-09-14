@@ -5,6 +5,7 @@ import cbor2
 
 SERVER = os.environ.get("TARIC_SERVER", "http://server:8080")
 ENTRY_COUNT = int(os.environ.get("ENTRY_COUNT", "0"))  # when >0, write N entries without assertions
+TEST_MODE = os.environ.get("TEST_MODE", "default")      # default | per_session | ack_verify
 
 def mk_entry(sk: SigningKey, device_id: str, key_id: str, payload: str, nonce: int, prev_hash: str|None, session_id: str|None = None):
 	entry = {
@@ -79,6 +80,36 @@ def main():
 			print("ACK:", r.json())
 			prev = e["entry_hash"]
 		print("Write-only mode complete")
+		return
+	elif TEST_MODE == "per_session":
+		# session A: nonces 1,2 accepted
+		prev = None
+		session_a = str(uuid.uuid4())
+		e1 = mk_entry(sk, device_id, key_id, json.dumps({"t":22.5}), 1, prev, session_a)
+		a1 = requests.post(f"{SERVER}/entries", json=e1, timeout=5).json()
+		assert a1["status"] == "accepted", a1
+		prev = e1["entry_hash"]
+		e2 = mk_entry(sk, device_id, key_id, json.dumps({"t":23.0}), 2, prev, session_a)
+		a2 = requests.post(f"{SERVER}/entries", json=e2, timeout=5).json()
+		assert a2["status"] == "accepted", a2
+		# session B: fresh session can start at 1
+		session_b = str(uuid.uuid4())
+		e3 = mk_entry(sk, device_id, key_id, json.dumps({"t":24.0}), 1, e2["entry_hash"], session_b)
+		a3 = requests.post(f"{SERVER}/entries", json=e3, timeout=5).json()
+		assert a3["status"] == "accepted", a3
+		print("per_session: PASS")
+		return
+	elif TEST_MODE == "ack_verify":
+		# verify server_signature present on both accepted and error ACKs
+		session = str(uuid.uuid4())
+		e1 = mk_entry(sk, device_id, key_id, json.dumps({"t":22.5}), 1, None, session)
+		a1 = requests.post(f"{SERVER}/entries", json=e1, timeout=5).json()
+		assert a1["server_signature"], a1
+		e2 = mk_entry(sk, device_id, key_id, json.dumps({"t":23.0}), 1, e1["entry_hash"], session)  # duplicate nonce to force error
+		a2 = requests.post(f"{SERVER}/entries", json=e2, timeout=5).json()
+		assert a2["status"].startswith("error:"), a2
+		assert a2["server_signature"], a2
+		print("ack_verify: PASS")
 		return
 	else:
 		# post two chained entries with assertions

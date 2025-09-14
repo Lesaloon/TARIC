@@ -4,7 +4,7 @@ use std::sync::Arc;
 use axum::{routing::{get, post}, Json, Router};
 use serde::Deserialize;
 use base64::Engine as _;
-use taric_core::{AckSigner, ChainStore, DeviceTrust, InMemoryChainStore, LogEntry, Verifier, VerifyingKey};
+use taric_core::{AckSigner, ChainStore, DeviceTrust, InMemoryChainStore, LogEntry, Verifier, VerifyingKey, Ed25519AckSigner};
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -16,10 +16,32 @@ impl DeviceTrust for StaticTrust {
     fn get_key(&self, _device_id: &str, _key_id: Option<&str>) -> Option<VerifyingKey> { Some(self.key.clone()) }
 }
 
-struct NopSigner;
-impl AckSigner for NopSigner {
-    fn signer_id(&self) -> &'static str { "server-key-1" }
-    fn sign(&self, msg: &[u8]) -> Vec<u8> { use ed25519_dalek::{SigningKey, Signer}; let sk = SigningKey::from_bytes(&[7u8;32]); sk.sign(msg).to_bytes().to_vec() }
+#[derive(Deserialize)]
+struct ServerKeyFixture { signer_id: String, algo: String, secret_key_base64: String }
+
+fn load_server_signer() -> Arc<dyn AckSigner> {
+    let path = std::env::var("TARIC_SERVER_KEY_PATH").unwrap_or_else(|_| "/fixtures/server/server_key.json".to_string());
+    match fs::read_to_string(&path) {
+        Ok(s) => {
+            match serde_json::from_str::<ServerKeyFixture>(&s) {
+                Ok(f) => {
+                    if f.algo != "ed25519" { eprintln!("Unsupported server key algo: {}", f.algo); }
+                    let sk_bytes = match base64::engine::general_purpose::STANDARD.decode(f.secret_key_base64.as_bytes()) {
+                        Ok(b) => b,
+                        Err(e) => { eprintln!("Failed to decode server secret key b64: {e}"); vec![7u8;32] }
+                    };
+                    let mut arr = [0u8; 32];
+                    if sk_bytes.len() == 32 { arr.copy_from_slice(&sk_bytes); } else { eprintln!("Server secret key must be 32 bytes (seed)"); }
+                    Arc::new(Ed25519AckSigner::from_secret_key(Box::leak(f.signer_id.into_boxed_str()), arr)) as Arc<dyn AckSigner>
+                }
+                Err(e) => { eprintln!("Invalid server key JSON: {e}"); Arc::new(Ed25519AckSigner::from_secret_key("server-dev", [7u8;32])) }
+            }
+        }
+        Err(_) => {
+            eprintln!("Server key not found at {path}; using ephemeral dev key. Set TARIC_SERVER_KEY_PATH or create fixtures/server/server_key.json");
+            Arc::new(Ed25519AckSigner::from_secret_key("server-dev", [7u8;32]))
+        }
+    }
 }
 
 
@@ -30,7 +52,7 @@ struct DeviceFixture { device_id: String, algo: String, key_id: String, pubkey_b
 #[tokio::main]
 async fn main() {
     let store: Arc<dyn ChainStore> = Arc::new(InMemoryChainStore::new());
-    let ack_signer: Arc<dyn AckSigner> = Arc::new(NopSigner);
+    let ack_signer: Arc<dyn AckSigner> = load_server_signer();
     let store_cloned = store.clone();
     let ack_signer_cloned = ack_signer.clone();
 
@@ -80,21 +102,25 @@ async fn main() {
                         VerifyingKey { algo: "ed25519".to_string(), key: vec![1u8; 32], key_id: Some("001-key1-1".into()) }
                     };
                     let trust = Arc::new(StaticTrust { key: vk });
-                    let verifier = Verifier::new(trust, store, ack_signer);
+                    let ack_signer_for_verifier = ack_signer.clone();
+                    let verifier = Verifier::new(trust, store, ack_signer_for_verifier);
                     match verifier.process_entry(&e, chrono::Utc::now().timestamp()) {
                         Ok(ack) => {
                             append_entry_jsonl(&e, &ack.status);
                             axum::response::Json(ack)
                         },
                         Err(err) => {
-                            let ack = taric_core::Ack {
+                            let mut ack = taric_core::Ack {
                                 entry_id: e.entry_hash.clone(),
                                 new_entry_hash: e.entry_hash.clone(),
                                 status: format!("error:{err}"),
                                 timestamp: chrono::Utc::now().timestamp(),
-                                server_signer_id: "server-key-1".into(),
+                                server_signer_id: ack_signer.signer_id().to_string(),
                                 server_signature: String::new(),
                             };
+                            let msg = taric_core::cbor_for_ack_sign(&ack);
+                            let sig = ack_signer.sign(&msg);
+                            ack.server_signature = base64::engine::general_purpose::STANDARD.encode(sig);
                             append_entry_jsonl(&e, &ack.status);
                             axum::response::Json(ack)
                         }

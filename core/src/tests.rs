@@ -127,3 +127,42 @@ fn rejects_revoked() {
     let err = verifier.process_entry(&e1, 1_700_000_050).unwrap_err();
     assert_eq!(err, VerifyError::Revoked("dev-1".into()));
 }
+
+#[test]
+fn per_session_nonce_behavior() {
+    let (sk, vk) = keys();
+    let (trust, store) = trust_and_store(&vk);
+    let signer = Ed25519AckSigner::from_secret_key("server-key-1", [9u8; 32]);
+    let verifier = Verifier::new(trust, store, Arc::new(signer));
+
+    fn recompute(sign_sk: &SigningKey, e: &mut LogEntry) {
+        e.entry_hash = compute_entry_hash(e);
+        let msg = cbor_for_sign(e);
+        let sig = sign_sk.sign(&msg);
+        e.signature = B64.encode(sig.to_bytes());
+    }
+
+    // Session A: nonce 1 then 2 accepted
+    let mut e1 = make_entry(&sk, "dev-1", Some("001-key1-1"), None, 1, 1_700_000_000, "A");
+    e1.session_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa".into();
+    recompute(&sk, &mut e1);
+    verifier.process_entry(&e1, 1_700_000_010).unwrap();
+
+    let mut e2 = make_entry(&sk, "dev-1", Some("001-key1-1"), Some(&e1.entry_hash), 2, 1_700_000_020, "B");
+    e2.session_id = e1.session_id.clone();
+    recompute(&sk, &mut e2);
+    verifier.process_entry(&e2, 1_700_000_030).unwrap();
+
+    // Session B: can start at 1 again; must link previous_entry_hash device-wide
+    let mut e3 = make_entry(&sk, "dev-1", Some("001-key1-1"), Some(&e2.entry_hash), 1, 1_700_000_040, "C");
+    e3.session_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb".into();
+    recompute(&sk, &mut e3);
+    verifier.process_entry(&e3, 1_700_000_050).unwrap();
+
+    // Exact +1: nonce 3 expected next in session B; using 5 must fail
+    let mut e_bad = make_entry(&sk, "dev-1", Some("001-key1-1"), Some(&e3.entry_hash), 5, 1_700_000_060, "D");
+    e_bad.session_id = e3.session_id.clone();
+    recompute(&sk, &mut e_bad);
+    let err = verifier.process_entry(&e_bad, 1_700_000_070).unwrap_err();
+    assert_eq!(err, VerifyError::NonceNotMonotonic);
+}

@@ -57,3 +57,21 @@ For a full demo, run the dockerized e2e in `tests-e2e/` (see root README Quickst
 - Replace the per-request fixture trust with a real trust provider implementing `DeviceTrust`.
 - Swap `InMemoryChainStore` for a persistent store (DB, append-only log).
 - Add authentication, rate limits, metrics, and structured logging.
+
+## Server Signing Key
+
+ACKs are signed with an Ed25519 server key loaded from JSON:
+
+Path: `tests-e2e/fixtures/server/server_key.json` (inside containers: `/fixtures/server/server_key.json`)
+
+Format:
+```json
+{ "signer_id": "server-key-1", "algo": "ed25519", "secret_key_base64": "<32-byte seed in base64>" }
+```
+
+Generate a key with the helper script:
+```bash
+bash scripts/setup-server-key.sh
+```
+
+Override the path with `TARIC_SERVER_KEY_PATH` if needed. If no key is found, the server uses an ephemeral dev key and logs a warning.

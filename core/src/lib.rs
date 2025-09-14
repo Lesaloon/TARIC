@@ -16,7 +16,7 @@ pub mod verifier;
 
 pub use errors::VerifyError;
 pub use traits::{AckSigner, ChainStore, DeviceTrust};
-pub use types::{Ack, LogEntry, VerifyingKey};
+pub use types::{Ack, LogEntry, VerifyingKey, cbor_for_ack_sign};
 pub use verifier::{Ed25519AckSigner, InMemoryChainStore, Verifier};
 
 /// Library version string.
