@@ -7,28 +7,32 @@ use ed25519_dalek::{Signature, SigningKey, VerifyingKey as DalekVerifyingKey, Si
 
 use crate::errors::VerifyError;
 use crate::traits::{AckSigner, ChainStore, DeviceTrust};
-use crate::types::{Ack, LogEntry, VerifyingKey, cbor_for_ack_sign, cbor_for_sign, compute_entry_hash};
+use crate::types::{Ack, LogEntry, cbor_for_ack_sign, cbor_for_sign, compute_entry_hash};
 
 /// Simple in-memory chain store suitable for tests and single-process demos.
 #[derive(Default)]
 pub struct InMemoryChainStore {
-    inner: Mutex<HashMap<String, (String, u64)>>,
+    // last hash per device
+    last_hash: Mutex<HashMap<String, String>>,
+    // last nonce per (device, session)
+    last_nonce: Mutex<HashMap<(String, String), u64>>,
 }
 
 impl InMemoryChainStore {
     /// Create a new, empty in-memory chain store.
-    pub fn new() -> Self { Self { inner: Mutex::new(HashMap::new()) } }
+    pub fn new() -> Self { Self { last_hash: Mutex::new(HashMap::new()), last_nonce: Mutex::new(HashMap::new()) } }
 }
 
 impl ChainStore for InMemoryChainStore {
     fn last_hash(&self, device_id: &str) -> Option<String> {
-        self.inner.lock().unwrap().get(device_id).map(|(h, _)| h.clone())
+        self.last_hash.lock().unwrap().get(device_id).cloned()
     }
-    fn last_nonce(&self, device_id: &str) -> Option<u64> {
-        self.inner.lock().unwrap().get(device_id).map(|(_, n)| *n)
+    fn last_nonce(&self, device_id: &str, session_id: &str) -> Option<u64> {
+        self.last_nonce.lock().unwrap().get(&(device_id.to_string(), session_id.to_string())).copied()
     }
-    fn update(&self, device_id: &str, last_hash: String, last_nonce: u64) {
-        self.inner.lock().unwrap().insert(device_id.to_string(), (last_hash, last_nonce));
+    fn update(&self, device_id: &str, session_id: &str, last_hash: String, last_nonce: u64) {
+        self.last_hash.lock().unwrap().insert(device_id.to_string(), last_hash);
+        self.last_nonce.lock().unwrap().insert((device_id.to_string(), session_id.to_string()), last_nonce);
     }
 }
 
@@ -84,8 +88,8 @@ impl Verifier {
         }
 
         // 4) Chain rules
-        let last_h = self.store.last_hash(&entry.device_id);
-        let last_n = self.store.last_nonce(&entry.device_id);
+    let last_h = self.store.last_hash(&entry.device_id);
+    let last_n = self.store.last_nonce(&entry.device_id, &entry.session_id);
         match (last_h, &entry.previous_entry_hash) {
             (None, None) => { /* first entry OK */ }
             (Some(h), Some(prev)) if h == *prev => { /* OK */ }
@@ -93,10 +97,14 @@ impl Verifier {
             (Some(h), Some(prev)) if h != *prev => return Err(VerifyError::PreviousHashMismatch),
             _ => {}
         }
-        if let Some(n) = last_n { if entry.nonce <= n { return Err(VerifyError::NonceNotMonotonic); } }
+        if let Some(n) = last_n {
+            if entry.nonce != n + 1 {
+                return Err(VerifyError::NonceNotMonotonic);
+            }
+        }
 
         // 5) Accept: update chain state and ACK
-        self.store.update(&entry.device_id, entry.entry_hash.clone(), entry.nonce);
+    self.store.update(&entry.device_id, &entry.session_id, entry.entry_hash.clone(), entry.nonce);
         let ack = self.make_ack(entry, now_ts);
         Ok(ack)
     }

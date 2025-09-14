@@ -7,7 +7,7 @@ Rust library implementing TARIC’s core verification, chaining, and ACK signing
 - CBOR canonicalization for hashing and signing (per `docs/api/wire-format.md`)
 - SHA-256 `entry_hash` computation (hex)
 - Ed25519 signature verification of device entries
-- Chain rules: previous hash continuity and strictly increasing nonces per device
+- Chain rules: previous hash continuity (device-wide) and nonce exactly +1 per device per session
 - Server ACK construction and signing
 - Pluggable `DeviceTrust` (key lookup + revocation)
 - Pluggable `ChainStore` (state persistence)
@@ -19,7 +19,7 @@ Rust library implementing TARIC’s core verification, chaining, and ACK signing
 - `Verifier::process_entry(&LogEntry, now_ts) -> Result<Ack, VerifyError>`
 - `Verifier::process_entry_json(&str, now_ts) -> Result<Ack, VerifyError>`
 - `trait DeviceTrust { get_key(...), is_revoked(...) }`
-- `trait ChainStore { last_hash(...), last_nonce(...), update(...) }`
+- `trait ChainStore { last_hash(device), last_nonce(device, session), update(device, session, ...) }`
 - `trait AckSigner { signer_id(), sign(msg) }`
 - `struct InMemoryChainStore`: simple in-memory store for demos/tests
 - `struct Ed25519AckSigner`: basic ACK signer for demos/tests

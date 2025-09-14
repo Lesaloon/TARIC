@@ -1,17 +1,19 @@
 services:
   server:
-    image: rust:1
+    image: rust:1-bookworm
     working_dir: /app/server
     volumes:
       - ../:/app
       - ./fixtures:/fixtures
-    command: bash -lc "cd /app && cargo run -p taric-server"
+    command: bash -lc "cd /app && /usr/local/cargo/bin/cargo run -p taric-server"
   runner:
     image: python:3.11
     working_dir: /tests
     volumes:
       - ./runner:/tests
       - ./fixtures:/fixtures
+    environment:
+      - ENTRY_COUNT
     command: bash -lc "pip install -r requirements.txt && python main.py"
     depends_on:
       - server

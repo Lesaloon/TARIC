@@ -5,7 +5,7 @@ use base64::engine::general_purpose::STANDARD as B64;
 use ed25519_dalek::{Signer, SigningKey, VerifyingKey as DalekVk};
 
 use crate::errors::VerifyError;
-use crate::traits::{AckSigner, ChainStore, DeviceTrust};
+use crate::traits::{ChainStore, DeviceTrust};
 use crate::types::{LogEntry, VerifyingKey, compute_entry_hash, cbor_for_sign};
 use crate::verifier::{Ed25519AckSigner, InMemoryChainStore, Verifier};
 
@@ -21,7 +21,7 @@ impl DeviceTrust for StaticTrust {
 
 fn make_entry(sign_sk: &SigningKey, device_id: &str, key_id: Option<&str>, prev: Option<&str>, nonce: u64, ts: i64, payload: &str) -> LogEntry {
     let mut e = LogEntry {
-        version: 1.0,
+        version: 1,
         entry_hash: String::new(),
         device_id: device_id.into(),
         timestamp: ts,

@@ -1,11 +1,14 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use axum::{routing::post, Json, Router};
+use axum::{routing::{get, post}, Json, Router};
 use serde::Deserialize;
 use base64::Engine as _;
 use taric_core::{AckSigner, ChainStore, DeviceTrust, InMemoryChainStore, LogEntry, Verifier, VerifyingKey};
 use std::fs;
+use std::fs::OpenOptions;
+use std::io::Write;
+use serde_json::json;
 
 #[derive(Clone)]
 struct StaticTrust { key: VerifyingKey }
@@ -32,6 +35,27 @@ async fn main() {
     let ack_signer_cloned = ack_signer.clone();
 
     let app = Router::new()
+        .route("/health", get(|| async { "ok" }))
+        .route("/entries", get({
+            move || async move {
+                let path = "/fixtures/entries.jsonl";
+                let body = if let Ok(s) = fs::read_to_string(path) {
+                    // Convert JSONL to JSON array
+                    let mut arr = Vec::new();
+                    for line in s.lines() {
+                        if line.trim().is_empty() { continue; }
+                        if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) { arr.push(v); }
+                    }
+                    serde_json::to_string(&arr).unwrap_or_else(|_| "[]".to_string())
+                } else {
+                    "[]".to_string()
+                };
+                axum::response::Response::builder()
+                    .header(axum::http::header::CONTENT_TYPE, "application/json")
+                    .body(axum::body::Body::from(body))
+                    .unwrap()
+            }
+        }))
         .route("/entries", post({
             move |Json(e): Json<LogEntry>| {
                 let store = store_cloned.clone();
@@ -42,7 +66,7 @@ async fn main() {
                     let vk = if let Ok(s) = fs::read_to_string(fixture_path) {
                         let f: DeviceFixture = serde_json::from_str(&s).expect("invalid device fixture JSON");
                         // ensure request device matches fixture device
-                        if f.device_id != e.device_id { 
+                        if f.device_id != e.device_id {
                             return axum::response::Json(taric_core::Ack {
                                 entry_id: e.entry_hash.clone(), new_entry_hash: e.entry_hash.clone(),
                                 status: format!("error:device_unknown:{}", e.device_id),
@@ -58,7 +82,10 @@ async fn main() {
                     let trust = Arc::new(StaticTrust { key: vk });
                     let verifier = Verifier::new(trust, store, ack_signer);
                     match verifier.process_entry(&e, chrono::Utc::now().timestamp()) {
-                        Ok(ack) => axum::response::Json(ack),
+                        Ok(ack) => {
+                            append_entry_jsonl(&e, &ack.status);
+                            axum::response::Json(ack)
+                        },
                         Err(err) => {
                             let ack = taric_core::Ack {
                                 entry_id: e.entry_hash.clone(),
@@ -68,6 +95,7 @@ async fn main() {
                                 server_signer_id: "server-key-1".into(),
                                 server_signature: String::new(),
                             };
+                            append_entry_jsonl(&e, &ack.status);
                             axum::response::Json(ack)
                         }
                     }
@@ -78,4 +106,16 @@ async fn main() {
     let addr: SocketAddr = "0.0.0.0:8080".parse().unwrap();
     println!("taric-server listening on {addr}");
     axum::serve(tokio::net::TcpListener::bind(addr).await.unwrap(), app).await.unwrap();
+}
+
+fn append_entry_jsonl(e: &LogEntry, status: &str) {
+    let path = "/fixtures/entries.jsonl";
+    let rec = json!({
+        "status": status,
+        "entry": e,
+        "recorded_at": chrono::Utc::now().timestamp(),
+    });
+    if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(f, "{}", rec.to_string());
+    }
 }

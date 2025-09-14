@@ -21,8 +21,8 @@ pub trait AckSigner: Send + Sync {
 pub trait ChainStore: Send + Sync {
     /// Get the last known hash, if any, for a device.
     fn last_hash(&self, device_id: &str) -> Option<String>;
-    /// Get the last known nonce, if any, for a device.
-    fn last_nonce(&self, device_id: &str) -> Option<u64>;
-    /// Update the (hash, nonce) for a device after accepting an entry.
-    fn update(&self, device_id: &str, last_hash: String, last_nonce: u64);
+    /// Get the last known nonce, if any, for a (device, session).
+    fn last_nonce(&self, device_id: &str, session_id: &str) -> Option<u64>;
+    /// Update the (hash, nonce) for a device and session after accepting an entry.
+    fn update(&self, device_id: &str, session_id: &str, last_hash: String, last_nonce: u64);
 }

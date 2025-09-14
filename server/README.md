@@ -11,9 +11,10 @@ A minimal HTTP server that exposes a single endpoint to verify and chain TARIC e
 
 - Loads the device public key from a shared fixture (`/fixtures/devices/device.json`) on every request.
 - Verifies the entry's `entry_hash` and signature using the supplied algorithm (Ed25519 supported now).
-- Enforces chaining rules: `previous_entry_hash` continuity and strictly increasing `nonce` per device.
+- Enforces chaining rules: `previous_entry_hash` continuity per device and `nonce` exactly +1 per device per session.
 - Updates in-memory chain state and returns a signed ACK with status `accepted`.
 - On failure, returns an `Ack`-shaped error with `status: "error:<reason>"`.
+ - Persists every received entry (accepted or error) to a JSONL file and exposes a list endpoint.
 
 ## Fixture format
 
@@ -28,6 +29,18 @@ Path: `/fixtures/devices/device.json`
 ```
 
 This demo server reloads the fixture per request to simplify testing. In production, provide a `DeviceTrust` backed by your PKI/DB.
+
+You can also generate fixtures with `scripts/setup-devices.sh`, which writes both `devices.json` (array) and `device.json` (single). The server currently reads `device.json`; `devices.json` support can be added by extending the trust implementation.
+
+## Endpoints
+
+- `POST /entries`: Submit a `LogEntry` JSON, receive an `Ack` JSON.
+- `GET /entries`: Returns a JSON array of stored records. Each record is:
+  ```json
+  { "status": "accepted" | "error:<reason>", "entry": { /* LogEntry */ }, "recorded_at": <unix_ts> }
+  ```
+
+Entries are appended to `tests-e2e/fixtures/entries.jsonl` (one JSON document per line).
 
 ## Run (dev)
 

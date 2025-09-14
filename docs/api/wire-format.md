@@ -2,12 +2,12 @@
 
 ## Log Entry
 
-    version: 1.0,
+  version: 1,
     entry_hash: string (SHA-256 hex) this entry's hash (excluding this field and the signature fields)
     device_id: string (UUID v4)
     timestamp: integer (Unix epoch seconds)
     session_id: string (UUID v4) to group entries from the same device session, e.g. after a reboot
-    nonce: integer (monotonically increasing per device) so it can be used to prevent replay attacks
+  nonce: integer (per device per session, increments by exactly +1) to prevent replay attacks within a session
     algo: string (e.g. "ed25519")
     key_id: string (key identifier, e.g. "001-key1") to allow key rotation ( ddd-keyN where N is the Nth key for device ddd)
     payload: string (opaque, e.g. JSON blob or binary data, base64-encoded if binary...)
@@ -18,12 +18,12 @@
 
 ```json
 {
-  "version": 1.0, // version of the log entry format
+  "version": 1, // version of the log entry format (integer)
   "entry_hash": "5f4dcc3b5aa765d61d8327deb882cf99", // SHA-256 hex of this entry (excluding this field)
   "device_id": "550e8400-e29b-41d4-a716-446655440000", // UUID v4
   "timestamp": 1700000000, // Unix epoch seconds
   "session_id": "550e8400-e29b-41d4-a716-446655440001", // UUID v4
-  "nonce": 1, // monotonically increasing per device to prevent replay attacks
+  "nonce": 1, // increments by exactly +1 per device per session
   "algo": "ed25519", // signing algorithm (e.g. "ed25519", "rsa-2048")
   "key_id": "001-key1-1", // key identifier for key rotation (ddd-keyN)
   "payload": "{\"temperature\": 22.5, \"humidity\": 45}", // opaque payload (e.g. JSON blob or binary data, base64-encoded if binary)
@@ -34,9 +34,8 @@
 
 ### canonicalization for hashing
 
-We are using CBOR for canonicalization before hashing, to ensure a stable binary representation of the log entry fields. The fields are serialized in the following order:
+We use CBOR for canonicalization before hashing, to ensure a stable binary representation of the log entry fields. The fields are serialized in the following order (excluding `entry_hash` and `signature`):
 1. version
-(excluding entry_hash)
 2. device_id
 3. timestamp
 4. session_id
@@ -44,12 +43,11 @@ We are using CBOR for canonicalization before hashing, to ensure a stable binary
 6. algo
 7. key_id
 8. payload
-(excluding the signature field)
 9. previous_entry_hash
 
 ### canonicalization for signing
 
-We are using CBOR for canonicalization before signing, to ensure a stable binary representation of the log entry fields. The fields are serialized in the following order:
+We use CBOR for canonicalization before signing, to ensure a stable binary representation of the log entry fields. The fields are serialized in the following order (excluding `signature`):
 1. version
 2. entry_hash
 3. device_id
@@ -59,10 +57,9 @@ We are using CBOR for canonicalization before signing, to ensure a stable binary
 7. algo
 8. key_id
 9. payload
-(excluding the signature field)
 10. previous_entry_hash
 
-The `signature` field is excluded from the canonicalization process as it is derived from the other fields and needs the canonicalized data to be generated.
+The `signature` field is excluded from canonicalization as it is derived from the other fields. The device-wide chain continuity is enforced via `previous_entry_hash` linking to the last accepted entry for the device.
 
 ## ACK
 

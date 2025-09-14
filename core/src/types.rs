@@ -13,7 +13,7 @@ pub struct VerifyingKey {
 /// Log entry as defined in the wire format.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LogEntry {
-    pub version: f32,
+    pub version: u8,
     pub entry_hash: String,
     pub device_id: String,
     pub timestamp: i64,
