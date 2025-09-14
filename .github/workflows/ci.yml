@@ -12,5 +12,5 @@ jobs:
       run: make -C clients/c
     - name: .NET build (example)
       uses: actions/setup-dotnet@v4
-      with: { dotnet-version: '8.0.x' }
+      with: { dotnet-version: '9.0.x' }
     - run: dotnet build examples/server-csharp/TaricServerDemo/TaricServerDemo.csproj
